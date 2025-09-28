@@ -70,6 +70,17 @@ def create_tables():
                 );
             """)
 
+            # For storing ML model forecasts
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS indicator_forecasts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    indicator_name TEXT NOT NULL,
+                    forecast_date DATE NOT NULL,
+                    predicted_value REAL,
+                    UNIQUE(indicator_name, forecast_date)
+                );
+            """)
+
             conn.commit()
             print("Database and tables created successfully.")
         except sqlite3.Error as e:
