@@ -8,78 +8,90 @@ from agent_core import run_analysis
 from config import DATABASE_NAME
 
 # --- Page Configuration ---
-st.set_page_config(
-    page_title="AI Investment Analyst",
-    page_icon="🧠",
-    layout="wide"
-)
+st.set_page_config(page_title="AI Investment Analyst", page_icon="🧠", layout="wide")
 
-# --- Page Title ---
-st.title("Context-Aware AI Investment Analyst 📈")
-st.markdown("This application uses a multi-agent AI system to generate a daily investment briefing for the Singapore market.")
+# --- Helper Functions to Fetch Data ---
+def get_db_connection():
+    return sqlite3.connect(DATABASE_NAME)
 
-# --- Database Function ---
 def get_latest_briefing():
     try:
-        conn = sqlite3.connect(DATABASE_NAME)
+        conn = get_db_connection()
         df = pd.read_sql_query("SELECT briefing_date, content FROM briefings ORDER BY briefing_date DESC LIMIT 1", conn)
         conn.close()
-        if not df.empty:
-            return df.iloc[0]['briefing_date'], df.iloc[0]['content']
+        return (df.iloc[0]['briefing_date'], df.iloc[0]['content']) if not df.empty else (None, None)
+    except pd.errors.DatabaseError:
+        return None, "Briefing table not found. Please run the analysis."
     except Exception as e:
-        # This handles the case where the table doesn't exist yet
-        st.error(f"Could not read briefings. Have you run the database setup? Error: {e}")
-        return None, None
-    return None, None
+        return None, f"An error occurred: {e}"
 
-# --- Main Application ---
-# Create two columns for controls and display
-col1, col2 = st.columns([1, 3])
+# --- Main App ---
+st.title("Context-Aware AI Investment Analyst 📈")
+st.markdown("An AI agent-driven system to analyze market data and generate daily investment briefings for the Singapore market.")
 
-with col1:
-    st.header("Controls")
-    
-    # Ingestion Button
-    if st.button("🔄 Ingest Latest Data"):
-        with st.spinner("Fetching data from APIs and storing in database..."):
-            run_ingestion()
-            st.success("Data ingestion complete!")
+# Create tabs for different sections of the app
+main_tab, eda_tab = st.tabs(["📊 Main Dashboard", "🔍 Exploratory Data Analysis"])
 
-    # Analysis Button
-    if st.button("🚀 Run Daily Analysis"):
-        with st.spinner("🤖 Agents are analyzing the market... this may take a few minutes."):
-            run_analysis()
-            st.success("Daily analysis complete! Briefing is ready.")
-            # Rerun to update the display
-            st.experimental_rerun()
+# --- Main Dashboard Tab ---
+with main_tab:
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.header("Controls")
+        if st.button("🔄 Ingest Latest Data"):
+            with st.spinner("Fetching data from APIs and storing in database..."):
+                run_ingestion()
+                st.success("Data ingestion complete!")
+        
+        if st.button("🚀 Run Daily Analysis"):
+            with st.spinner("🤖 Agents are analyzing the market... this may take a few minutes."):
+                run_analysis()
+                st.success("Daily analysis complete! Briefing is ready.")
+                st.experimental_rerun()
 
-with col2:
-    st.header("Latest Investment Briefing")
-    
-    # Display the latest briefing
-    date, content = get_latest_briefing()
-    
-    if date:
-        st.subheader(f"For Date: {date}")
-        st.markdown(content)
-    else:
-        st.info("No briefing available. Run the daily analysis to generate one.")
+    with col2:
+        st.header("Latest Investment Briefing")
+        date, content = get_latest_briefing()
+        if date:
+            st.subheader(f"For Date: {date}")
+            st.markdown(content)
+        else:
+            st.info("No briefing available. Run data ingestion and then daily analysis to generate one.")
 
-# --- Add a separator ---
-st.markdown("---")
+# --- Exploratory Data Analysis (EDA) Tab ---
+with eda_tab:
+    st.header("🔍 Exploratory Data Analysis")
+    st.write("Visualize the raw data that the AI agents use for their analysis.")
 
-# --- Data Preview Section ---
-st.header("Data Previews")
-preview_tabs = st.tabs(["Stock Data", "Economic Data", "News Data"])
+    try:
+        conn = get_db_connection()
+        
+        # --- Economic Indicators Visualization ---
+        st.subheader("Economic Indicators")
+        indicators = pd.read_sql_query("SELECT DISTINCT indicator_name FROM singstat_data", conn)['indicator_name'].tolist()
+        if indicators:
+            selected_indicator = st.selectbox("Select an Indicator to Visualize", options=indicators)
+            if selected_indicator:
+                df_econ = pd.read_sql_query(f"SELECT record_date, value FROM singstat_data WHERE indicator_name = '{selected_indicator}'", conn, parse_dates=['record_date'])
+                df_econ = df_econ.set_index('record_date')
+                st.line_chart(df_econ)
+                st.dataframe(df_econ.sort_index(ascending=False).head())
+        else:
+            st.warning("No economic data found. Please run data ingestion.")
 
-try:
-    conn = sqlite3.connect(DATABASE_NAME)
-    with preview_tabs[0]:
-        st.dataframe(pd.read_sql_query("SELECT * FROM sgx_stocks_daily ORDER BY record_date DESC LIMIT 10", conn))
-    with preview_tabs[1]:
-        st.dataframe(pd.read_sql_query("SELECT * FROM singstat_data ORDER BY record_date DESC LIMIT 10", conn))
-    with preview_tabs[2]:
-        st.dataframe(pd.read_sql_query("SELECT * FROM unstructured_news ORDER BY published_date DESC LIMIT 10", conn))
-    conn.close()
-except Exception:
-    st.warning("Could not load data previews. Please run the data ingestion first.")
+        # --- Stock Data Visualization ---
+        st.subheader("SGX Stock Prices (Close)")
+        tickers = pd.read_sql_query("SELECT DISTINCT ticker FROM sgx_stocks_daily", conn)['ticker'].tolist()
+        if tickers:
+            selected_ticker = st.selectbox("Select a Stock Ticker to Visualize", options=tickers)
+            if selected_ticker:
+                df_stock = pd.read_sql_query(f"SELECT record_date, close_price FROM sgx_stocks_daily WHERE ticker = '{selected_ticker}'", conn, parse_dates=['record_date'])
+                df_stock = df_stock.set_index('record_date')
+                st.line_chart(df_stock)
+                st.dataframe(df_stock.sort_index(ascending=False).head())
+        else:
+            st.warning("No stock data found. Please run data ingestion.")
+
+        conn.close()
+
+    except Exception as e:
+        st.error(f"Failed to load data for EDA. Please ensure data has been ingested. Error: {e}")
