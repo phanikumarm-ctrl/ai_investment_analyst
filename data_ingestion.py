@@ -1,12 +1,74 @@
 # data_ingestion.py
 import sqlite3
 import yfinance as yf
-from datetime import datetime, timedelta
+import requests # New import
 import pandas as pd
-from config import DATABASE_NAME
+from datetime import datetime, timedelta
+from config import DATABASE_NAME, SINGSTAT_API_KEY # Import API key
+
+def fetch_and_store_singstat_data(indicator_name, resource_id):
+    """Fetches a specific time series from SingStat API and stores it."""
+    if not SINGSTAT_API_KEY:
+        print(f"Skipping {indicator_name}: SINGSTAT_API_KEY not found in .env file.")
+        return
+
+    print(f"Fetching {indicator_name} from SingStat...")
+    api_url = "https://tablebuilder.singstat.gov.sg/api/table/tabledata"
+    
+    # Calculate date range for the last 36 months
+    to_date = datetime.now()
+    from_date = to_date - timedelta(days=36*30)
+    
+    payload = {
+        "resourceId": resource_id,
+        "searchCriteria": {
+            "timeFrom": from_date.strftime('%Y%m'),
+            "timeTo": to_date.strftime('%Y%m')
+        }
+    }
+    headers = {"Content-Type": "application/json", "api-key": SINGSTAT_API_KEY}
+
+    try:
+        response = requests.post(api_url, json=payload, headers=headers)
+        response.raise_for_status()
+        
+        records = []
+        # The API response is nested; we need to parse it carefully
+        for row in response.json()['Data']['row']:
+            # The 'key' is the date, e.g., "2024 Sep"
+            date_str = row['key']
+            # The 'columns' list contains the value
+            value = row['columns'][0]['value']
+            
+            # Convert date string to a proper date format
+            record_date = datetime.strptime(date_str, "%Y %b").date()
+            if value.replace('.', '', 1).isdigit(): # Check if value is a valid number
+                 records.append({
+                    "indicator_name": indicator_name,
+                    "record_date": record_date,
+                    "value": float(value)
+                })
+
+        if not records:
+            print(f"No data found for {indicator_name}.")
+            return
+
+        df = pd.DataFrame(records)
+        conn = sqlite3.connect(DATABASE_NAME)
+        df.to_sql('singstat_data', conn, if_exists='append', index=False)
+        conn.close()
+        print(f"Successfully stored {len(df)} records for {indicator_name}.")
+
+    except requests.exceptions.HTTPError as e:
+        print(f"Error fetching data for {indicator_name}: {e.response.text}")
+    except (KeyError, IndexError, TypeError) as e:
+        print(f"Error parsing API response for {indicator_name}: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred for {indicator_name}: {e}")
+
 
 def store_sgx_data(tickers):
-    """Fetches and stores daily stock data for a list of SGX tickers."""
+    # This function remains the same as before
     print("Fetching SGX stock data...")
     conn = sqlite3.connect(DATABASE_NAME)
     end_date = datetime.now()
@@ -19,7 +81,6 @@ def store_sgx_data(tickers):
                 stock_data = stock_data.reset_index()
                 stock_data.rename(columns={'Date': 'record_date', 'Close': 'close_price', 'Volume': 'volume'}, inplace=True)
                 stock_data['ticker'] = ticker
-                # Keep only necessary columns
                 final_data = stock_data[['ticker', 'record_date', 'close_price', 'volume']]
                 final_data.to_sql('sgx_stocks_daily', conn, if_exists='append', index=False)
                 print(f"Data for {ticker} stored.")
@@ -27,28 +88,9 @@ def store_sgx_data(tickers):
             print(f"Could not fetch data for {ticker}: {e}")
     conn.close()
 
-def store_mock_economic_data():
-    """Stores mock economic data for demonstration."""
-    print("Storing mock economic data...")
-    conn = sqlite3.connect(DATABASE_NAME)
-    # Creating a dummy DataFrame for CPI and Manufacturing Output
-    dates = pd.to_datetime(pd.date_range(end=datetime.now(), periods=12, freq='MS'))
-    cpi_data = pd.DataFrame({
-        'indicator_name': 'CPI_All_Items',
-        'record_date': dates,
-        'value': [102.5, 102.8, 103.1, 103.0, 103.5, 103.6, 103.8, 104.0, 104.2, 104.1, 104.5, 104.8]
-    })
-    mfg_data = pd.DataFrame({
-        'indicator_name': 'Manufacturing_Output',
-        'record_date': dates,
-        'value': [98.5, 99.2, 99.8, 100.5, 100.2, 101.1, 101.5, 101.3, 102.0, 102.5, 102.3, 103.1]
-    })
-    cpi_data.to_sql('singstat_data', conn, if_exists='append', index=False)
-    mfg_data.to_sql('singstat_data', conn, if_exists='append', index=False)
-    conn.close()
 
 def store_mock_news_data():
-    """Stores mock news articles for demonstration."""
+    # This function remains the same as before
     print("Storing mock news data...")
     conn = sqlite3.connect(DATABASE_NAME)
     news_data = pd.DataFrame([
@@ -60,19 +102,27 @@ def store_mock_news_data():
     news_data.to_sql('unstructured_news', conn, if_exists='append', index=False)
     conn.close()
 
+
 def run_ingestion():
     """Runs all data ingestion functions."""
-    # Note: Clear existing data to avoid duplicates in this simple setup
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
+    # Clear existing data to avoid duplicates on each run
     cursor.execute("DELETE FROM sgx_stocks_daily;")
     cursor.execute("DELETE FROM singstat_data;")
     cursor.execute("DELETE FROM unstructured_news;")
     conn.commit()
     conn.close()
     
+    # --- Live SingStat API Calls ---
+    # NOTE: These resource IDs are examples and may change.
+    # You can find them by exploring tables on the SingStat website.
+    fetch_and_store_singstat_data("CPI_All_Items", "M212881")
+    fetch_and_store_singstat_data("Manufacturing_Output", "M015121")
+    fetch_and_store_singstat_data("International_Trade_Total", "M082121")
+    
     sgx_tickers = ["C6L.SI", "D05.SI", "O39.SI"] # SIA, DBS, OCBC
     store_sgx_data(sgx_tickers)
-    store_mock_economic_data()
     store_mock_news_data()
-    print("Data ingestion complete.")
+    print("\nData ingestion complete.")
+    
