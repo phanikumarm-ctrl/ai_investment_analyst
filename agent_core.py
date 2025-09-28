@@ -56,16 +56,13 @@ today = datetime.now().strftime('%Y-%m-%d')
 # Task 1: Macroeconomic Analysis
 macro_analysis_task = Task(
     description=f"""
-    Conduct a comprehensive macroeconomic analysis for today, {today}.
-    1. Query the database for the latest data on the following key indicators:
-       - 'GDP_Quarterly' to understand overall economic health.
-       - 'CPI_All_Items' to assess inflation.
-       - 'Retail_Sales_Index' to gauge consumer spending.
-       - 'Foreign_Direct_Investment' to understand capital inflows.
-    2. Analyze the recent trends for each of these indicators.
-    3. Synthesize your findings into a multi-faceted macroeconomic outlook for Singapore. Start with a concluding sentiment (e.g., 'Positive', 'Cautiously Optimistic', 'Neutral', 'Negative').
+    Conduct a forward-looking macroeconomic analysis for today, {today}.
+    1. First, query the 'indicator_forecasts' table to get the ML-generated predictions for the next quarter for key indicators like 'GDP_Quarterly' and 'CPI_All_Items'.
+    2. Next, query the 'singstat_data' table to analyze the historical trends of these same indicators.
+    3. Synthesize both the historical data and the future forecasts to form a comprehensive economic outlook.
+    4. Conclude with a forward-looking summary that explicitly mentions whether the forecasts suggest an acceleration, deceleration, or continuation of current trends.
     """,
-    expected_output="A well-structured report starting with a clear 'Overall Sentiment' line, followed by concise analysis paragraphs for GDP, inflation, consumer spending, and investment trends.",
+    expected_output="An insightful economic outlook that integrates both historical trends and ML-based forecasts. The report must contain a 'Future Outlook' section that discusses the predicted trajectory of the economy.",
     agent=macro_strategist
 )
 
