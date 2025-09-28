@@ -27,7 +27,6 @@ def get_latest_briefing():
         return None, f"An error occurred: {e}"
 
 # --- Main App ---
-# --- Main App ---
 st.title("Predictive AI Investment Analyst 🔮")
 st.markdown("An AI agent-driven system, enhanced with ML forecasting, to generate forward-looking investment briefings.")
 
