@@ -4,3 +4,4 @@ yfinance
 python-dotenv
 pandas
 langchain-google-vertexai
+requests
