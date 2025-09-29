@@ -9,6 +9,8 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 VERTEX_AI_PROJECT = os.getenv("VERTEX_AI_PROJECT")
 VERTEX_AI_LOCATION = os.getenv("VERTEX_AI_LOCATION")
+SINGSTAT_API_KEY = os.getenv("SINGSTAT_API_KEY")
+
 
 # --- Database Configuration ---
 DATABASE_NAME = "investment_analysis.db"

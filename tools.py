@@ -1,7 +1,7 @@
 # tools.py
 import sqlite3
 import pandas as pd
-from crewai_tools import BaseTool
+from crewai.tools import BaseTool
 from config import DATABASE_NAME
 
 class DatabaseTool(BaseTool):

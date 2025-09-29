@@ -11,6 +11,8 @@ from config import DATABASE_NAME
 # --- Page Configuration ---
 st.set_page_config(page_title="AI Investment Analyst", page_icon="🧠", layout="wide")
 
+st.write("Hello Streamlit!")
+
 # --- Helper Functions to Fetch Data ---
 def get_db_connection():
     return sqlite3.connect(DATABASE_NAME)
@@ -34,8 +36,10 @@ main_tab, eda_tab = st.tabs(["📊 Main Dashboard", "🔍 Exploratory Data Analy
 
 # --- Main Dashboard Tab ---
 with main_tab:
+    st.write("Hello Streamlit2!")
     col1, col2 = st.columns([1, 3])
     with col1:
+        st.write("Hello Streamlit3!")
         st.header("Controls")
         st.markdown("Follow these steps in order:")
         
@@ -69,6 +73,7 @@ with main_tab:
 
 # --- Exploratory Data Analysis (EDA) Tab ---
 with eda_tab:
+    st.write("Hello Streamlit4!")
     st.header("🔍 Exploratory Data Analysis & Forecasts")
     st.write("Visualize the raw data that the AI agents use for their analysis.")
 
@@ -111,3 +116,5 @@ with eda_tab:
         
     except Exception as e:
         st.error(f"Failed to load data for EDA. Please ensure data has been ingested. Error: {e}")
+
+st.write("Hello Streamlit5!")

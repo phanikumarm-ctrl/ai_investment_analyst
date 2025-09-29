@@ -6,3 +6,4 @@ pandas
 langchain-google-vertexai
 requests
 prophet
+langchain_google_vertexai
